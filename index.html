@@ -1,0 +1,141 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Live Screen</title>
+    <style>
+        body { 
+            margin: 0; 
+            background: #111; 
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        .container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+        .status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .key-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img id="screen" src="" tabindex="0" />
+        <div class="status">🟢 Connected</div>
+        <div class="key-info">Click screen to enable keyboard control</div>
+    </div>
+    <script>
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+        
+        const img = document.getElementById('screen');
+        const ws = new WebSocket('wss://' + location.host);
+
+        ws.binaryType = 'arraybuffer';
+
+        ws.onmessage = (event) => {
+            const blob = new Blob([event.data], { type: 'image/jpeg' });
+            img.src = URL.createObjectURL(blob);
+        };
+
+        window.addEventListener('keydown', (event) => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'keypress',
+                    key: event.key,
+                    keyCode: event.keyCode,
+                    shiftKey: event.shiftKey,
+                    ctrlKey: event.ctrlKey,
+                    altKey: event.altKey
+                }));
+            }
+        });
+
+        let lastX = 0, lastY = 0;
+
+        img.addEventListener('click', (event) => {
+            window.focus();
+            const rect = img.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'mouseclick',
+                    x: x,
+                    y: y
+                }));
+            }
+        });
+        img.addEventListener('mousemove', (event) => {
+            const rect = img.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+
+            if (Math.abs(x - lastX) > 0.001 || Math.abs(y - lastY) > 0.001) {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'mousemove',
+                        x: x,
+                        y: y
+                    }));
+                }
+                lastX = x;
+                lastY = y;
+            }
+        });
+        img.addEventListener('mousedown', (event) => {
+            img.focus();
+            const rect = img.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+
+            ws.send(JSON.stringify({
+                type: 'mouseclick',
+                x: x,
+                y: y,
+                button: event.button
+            }));
+        });
+
+        img.addEventListener('mousemove', (event) => {
+            const rect = img.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+
+            if (Math.abs(x - lastX) > 0.001 || Math.abs(y - lastY) > 0.001) {
+                ws.send(JSON.stringify({
+                    type: 'mousemove',
+                    x: x,
+                    y: y
+                }));
+                lastX = x;
+                lastY = y;
+            }
+        });
+    </script>
+</body>
+</html>
